@@ -9,6 +9,32 @@ const MetaStruct = metadata.MetaStruct;
 
 const MAX_READ_SIZE = 256;
 
+/// The BEAM's pid, read by the signal handler. A handler may touch nothing
+/// else, so this is the whole shared state.
+var beam_pid: std.atomic.Value(i32) = std.atomic.Value(i32).init(0);
+
+/// Without this the wrapper absorbs SIGTERM and the BEAM is killed without
+/// running its shutdown, orphaning every port program it supervises: launchd,
+/// systemd and a plain `kill` all signal the wrapper, not the child.
+fn forwardSignal(sig: std.posix.SIG) callconv(.c) void {
+    const pid = beam_pid.load(.seq_cst);
+    if (pid > 0) _ = std.c.kill(pid, sig);
+}
+
+fn forwardSignalsTo(pid: i32) void {
+    beam_pid.store(pid, .seq_cst);
+
+    const act = std.posix.Sigaction{
+        .handler = .{ .handler = forwardSignal },
+        .mask = std.posix.sigemptyset(),
+        .flags = 0,
+    };
+
+    std.posix.sigaction(std.posix.SIG.TERM, &act, null);
+    std.posix.sigaction(std.posix.SIG.INT, &act, null);
+    std.posix.sigaction(std.posix.SIG.HUP, &act, null);
+}
+
 fn get_erl_exe_name() []const u8 {
     if (builtin.os.tag == .windows) {
         return "erl.exe";
@@ -120,6 +146,10 @@ pub fn launch(io: Io, install_dir: []const u8, env_map: *std.process.Environ.Map
             .argv = final_args,
             .environ_map = env_map,
         });
+    }
+
+    if (comptime builtin.os.tag != .windows) {
+        if (child.id) |pid| forwardSignalsTo(pid);
     }
 
     const term = if (builtin.os.tag != .windows)
