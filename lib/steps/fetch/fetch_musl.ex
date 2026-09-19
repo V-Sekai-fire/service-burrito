@@ -16,8 +16,11 @@ defmodule Burrito.Steps.Fetch.FetchMusl do
   @behaviour Step
 
   @impl Step
+  # Every Linux wrapper embeds the musl runtime, so this runs for any ERTS
+  # source. Matching only `:precompiled` left `custom_erts:` builds without
+  # src/musl-runtime.so and failed them in the zig compile, not here.
   def execute(
-        %Context{target: %Target{os: :linux, cpu: arch, erts_source: {:precompiled, _}} = _target} =
+        %Context{target: %Target{os: :linux, cpu: arch} = _target} =
           context
       ) do
     Log.info(:step, "Fetching musl libc runtime binary for Linux...")
