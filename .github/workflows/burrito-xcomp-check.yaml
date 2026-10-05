@@ -37,7 +37,7 @@ jobs:
       - name: Set up Homebrew
         if: matrix.host == 'macos-latest'
         id: set-up-homebrew
-        uses: Homebrew/actions/setup-homebrew@master
+        uses: Homebrew/actions/setup-homebrew@a657b8b0cd35d0f65cce41fce9b24cf054b49869 # 2026.08.24.1
 
       - run: sudo apt-get -y install xz-utils
         if: matrix.host == 'ubuntu-latest'
